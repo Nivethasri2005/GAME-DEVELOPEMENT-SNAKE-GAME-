@@ -15,6 +15,7 @@ OVERVIEW OF THE PROJECT
 Project: To develop a graphical snake game 
 
 OBJECTIVE
+
 The objective of the project is to create a graphical snake game using libraries like SFML and SDL
 
 REQUIREMENTS

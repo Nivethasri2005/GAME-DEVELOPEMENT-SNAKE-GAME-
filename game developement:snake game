@@ -1,0 +1,192 @@
+#include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <iostream>
+
+using namespace sf;
+
+// Constants
+const int WINDOW_WIDTH = 800;
+const int WINDOW_HEIGHT = 600;
+const int GRID_SIZE = 20;
+const int INIT_SNAKE_LENGTH = 4;
+
+// Directions
+enum Direction { UP, DOWN, LEFT, RIGHT };
+
+struct SnakeSegment {
+    int x, y;
+};
+
+class SnakeGame {
+private:
+    RenderWindow window;
+    RectangleShape snakeSegment;
+    RectangleShape foodShape;
+    std::vector<SnakeSegment> snake;
+    SnakeSegment food;
+    Direction currentDirection;
+    bool isGameOver;
+    int score;
+    Clock clock;
+    float speed;
+
+    SoundBuffer eatBuffer, gameOverBuffer;
+    Sound eatSound, gameOverSound;
+
+    Font font;
+    Text scoreText, gameOverText;
+
+    void initGame() {
+        // Initialize the snake
+        snake.clear();
+        for (int i = 0; i < INIT_SNAKE_LENGTH; ++i) {
+            snake.push_back({WINDOW_WIDTH / (2 * GRID_SIZE) + i, WINDOW_HEIGHT / (2 * GRID_SIZE)});
+        }
+
+        currentDirection = LEFT;
+        isGameOver = false;
+        score = 0;
+        speed = 0.15f;
+
+        // Place the first food
+        placeFood();
+
+        // Setup sounds
+        if (!eatBuffer.loadFromFile("eat.wav") || !gameOverBuffer.loadFromFile("gameover.wav")) {
+            std::cerr << "Error loading sound files!\n";
+        }
+        eatSound.setBuffer(eatBuffer);
+        gameOverSound.setBuffer(gameOverBuffer);
+
+        // Setup text
+        if (!font.loadFromFile("arial.ttf")) {
+            std::cerr << "Error loading font!\n";
+        }
+        scoreText.setFont(font);
+        scoreText.setCharacterSize(24);
+        scoreText.setFillColor(Color::White);
+        scoreText.setPosition(10, 10);
+
+        gameOverText.setFont(font);
+        gameOverText.setCharacterSize(50);
+        gameOverText.setFillColor(Color::Red);
+        gameOverText.setString("Game Over! Press R to Restart");
+        gameOverText.setPosition(WINDOW_WIDTH / 2 - 200, WINDOW_HEIGHT / 2 - 50);
+    }
+
+    void placeFood() {
+        food.x = std::rand() % (WINDOW_WIDTH / GRID_SIZE);
+        food.y = std::rand() % (WINDOW_HEIGHT / GRID_SIZE);
+    }
+
+    void processInput() {
+        if (Keyboard::isKeyPressed(Keyboard::Up) && currentDirection != DOWN) currentDirection = UP;
+        else if (Keyboard::isKeyPressed(Keyboard::Down) && currentDirection != UP) currentDirection = DOWN;
+        else if (Keyboard::isKeyPressed(Keyboard::Left) && currentDirection != RIGHT) currentDirection = LEFT;
+        else if (Keyboard::isKeyPressed(Keyboard::Right) && currentDirection != LEFT) currentDirection = RIGHT;
+
+        if (isGameOver && Keyboard::isKeyPressed(Keyboard::R)) {
+            initGame();
+        }
+    }
+
+    void updateGame() {
+        if (clock.getElapsedTime().asSeconds() < speed || isGameOver) return;
+        clock.restart();
+
+        // Move the snake
+        SnakeSegment newHead = snake.front();
+        switch (currentDirection) {
+            case UP: newHead.y--; break;
+            case DOWN: newHead.y++; break;
+            case LEFT: newHead.x--; break;
+            case RIGHT: newHead.x++; break;
+        }
+
+        // Check collisions
+        if (newHead.x < 0 || newHead.x >= WINDOW_WIDTH / GRID_SIZE ||
+            newHead.y < 0 || newHead.y >= WINDOW_HEIGHT / GRID_SIZE) {
+            isGameOver = true;
+            gameOverSound.play();
+            return;
+        }
+
+        for (const auto& segment : snake) {
+            if (newHead.x == segment.x && newHead.y == segment.y) {
+                isGameOver = true;
+                gameOverSound.play();
+                return;
+            }
+        }
+
+        snake.insert(snake.begin(), newHead);
+
+        // Check food collision
+        if (newHead.x == food.x && newHead.y == food.y) {
+            score += 10;
+            speed = std::max(speed - 0.005f, 0.05f); // Increase difficulty
+            eatSound.play();
+            placeFood();
+        } else {
+            snake.pop_back(); // Remove tail if no food eaten
+        }
+
+        scoreText.setString("Score: " + std::to_string(score));
+    }
+
+    void renderGame() {
+        window.clear(Color::Black);
+
+        if (isGameOver) {
+            window.draw(gameOverText);
+        } else {
+            // Draw snake
+            for (const auto& segment : snake) {
+                snakeSegment.setPosition(segment.x * GRID_SIZE, segment.y * GRID_SIZE);
+                window.draw(snakeSegment);
+            }
+
+            // Draw food
+            foodShape.setPosition(food.x * GRID_SIZE, food.y * GRID_SIZE);
+            window.draw(foodShape);
+
+            // Draw score
+            window.draw(scoreText);
+        }
+
+        window.display();
+    }
+
+public:
+    SnakeGame() : window(VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Snake Game"),
+                  snakeSegment(Vector2f(GRID_SIZE, GRID_SIZE)),
+                  foodShape(Vector2f(GRID_SIZE, GRID_SIZE)) {
+        snakeSegment.setFillColor(Color::Green);
+        foodShape.setFillColor(Color::Red);
+        std::srand(static_cast<unsigned>(std::time(nullptr)));
+        initGame();
+    }
+
+    void run() {
+        while (window.isOpen()) {
+            Event event;
+            while (window.pollEvent(event)) {
+                if (event.type == Event::Closed)
+                    window.close();
+            }
+
+            processInput();
+            updateGame();
+            renderGame();
+        }
+    }
+};
+
+int main() {
+    SnakeGame game;
+    game.run();
+    return 0;
+}

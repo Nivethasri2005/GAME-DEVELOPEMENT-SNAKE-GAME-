@@ -26,5 +26,4 @@ FEATURES
 
 An visually engaged game with sound effects and increasing difficulty levels
 
-OUTPUT
 
